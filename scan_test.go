@@ -1,17 +1,17 @@
 package sqlz_test
 
+//go:generate go run github.com/golang/mock/mockgen --source scan.go --package mocks --destination internal/mocks/mocks.go
+
 import (
 	"context"
 	"testing"
 	"time"
 
 	"github.com/semrekkers/sqlz"
-	"github.com/semrekkers/sqlz/mocks"
+	"github.com/semrekkers/sqlz/internal/mocks"
 
 	"github.com/golang/mock/gomock"
 )
-
-//go:generate go run github.com/golang/mock/mockgen --source scan.go --package mocks --destination mocks/mocks.go
 
 type testStruct struct {
 	ID        int
