@@ -11,7 +11,7 @@ import (
 // Null represents a nullable type of T.
 type Null[T any] struct {
 	Some  T    // the actual value
-	Valid bool // Valid is true if Some is not NULL
+	Valid bool // Valid is true if Some is not null
 }
 
 // NewNull returns a new nullable type of T, initialized with the given value.
@@ -27,11 +27,16 @@ func (n *Null[T]) Set(value T) {
 	n.Some, n.Valid = value, true
 }
 
+// Invalidate sets n to its null value.
+func (n *Null[T]) Invalidate() {
+	var zero T
+	n.Some, n.Valid = zero, false
+}
+
 // Scan implements [sql.Scanner].
 func (n *Null[T]) Scan(value any) error {
 	if value == nil {
-		var zero T
-		n.Some, n.Valid = zero, false
+		n.Invalidate()
 		return nil
 	}
 	var ptr any = &n.Some
@@ -80,8 +85,7 @@ func (n Null[T]) MarshalJSON() ([]byte, error) {
 // UnmarshalJSON implements [json.Unmarshaler].
 func (n *Null[T]) UnmarshalJSON(data []byte) error {
 	if bytes.Equal(data, nullBytes) {
-		var zero T
-		n.Some, n.Valid = zero, false
+		n.Invalidate()
 		return nil
 	}
 	if err := json.Unmarshal(data, &n.Some); err != nil {
@@ -95,5 +99,5 @@ func (n Null[T]) String() string {
 	if n.Valid {
 		return fmt.Sprintf("sqlz.Null[%T]{%[1]v}", n.Some)
 	}
-	return fmt.Sprintf("sqlz.Null[%T]{<NULL>}", n.Some)
+	return fmt.Sprintf("sqlz.Null[%T]{<null>}", n.Some)
 }
