@@ -9,9 +9,10 @@ import (
 )
 
 // Null represents a nullable type of T.
+// The zero value for Null[T] is its null state (Valid is false).
 type Null[T any] struct {
 	Some  T    // the actual value
-	Valid bool // Valid is true if Some is not null
+	Valid bool // Valid is true if this value is not null
 }
 
 // NewNull returns a new nullable type of T, initialized with the given value.

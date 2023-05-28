@@ -167,3 +167,15 @@ func TestNullUnmarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func ExampleNull() {
+	var x sqlz.Null[string]
+	fmt.Println("Zero value is null:", x)
+	x.Set("My value")
+	fmt.Println("Now x is set to the value:", x)
+	fmt.Println("And x.Valid is true:", x.Valid)
+	// Output:
+	// Zero value is null: sqlz.Null[string]{<null>}
+	// Now x is set to the value: sqlz.Null[string]{My value}
+	// And x.Valid is true: true
+}
