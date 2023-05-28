@@ -67,7 +67,7 @@ func TestScanStruct(t *testing.T) {
 	err := sqlz.Scan(context.Background(), rows, &record)
 
 	if err != nil {
-		t.Fatal("sqlz.Scan():", err)
+		t.Error("sqlz.Scan(...):", err)
 	}
 }
 
@@ -86,7 +86,7 @@ func TestScanMissingField(t *testing.T) {
 	err := sqlz.Scan(context.Background(), rows, &record)
 
 	if err.Error() != `sqlz: missing field mapping for column "order_id"` {
-		t.Fatalf("err{%s} != `sqlz: missing field mapping ...`", err)
+		t.Errorf("err{%s} != `sqlz: missing field mapping ...`", err)
 	}
 }
 
@@ -133,14 +133,14 @@ func TestScanSlice(t *testing.T) {
 	err := sqlz.Scan(context.Background(), rows, &records)
 
 	if err != nil {
-		t.Fatal("sqlz.Scan():", err)
+		t.Error("sqlz.Scan(...):", err)
 	}
 	if len(records) != 4 {
-		t.Fatalf("len(records){%d} != 4", len(records))
+		t.Errorf("len(records){%d} != 4", len(records))
 	}
 	for i, v := range records {
 		if expect := i + 1; v.ID != expect {
-			t.Fatalf("records[%d].ID{%d} != %d", i, v.ID, expect)
+			t.Errorf("records[%d].ID{%d} != %d", i, v.ID, expect)
 		}
 	}
 }
@@ -183,14 +183,14 @@ func TestScanChan(t *testing.T) {
 	close(records)
 
 	if err != nil {
-		t.Fatal("sqlz.Scan():", err)
+		t.Error("sqlz.Scan(...):", err)
 	}
 	var recordCount int
 	for range records {
 		recordCount++
 	}
 	if recordCount != 4 {
-		t.Fatalf("recordCount{%d} != 4", recordCount)
+		t.Errorf("recordCount{%d} != 4", recordCount)
 	}
 }
 
@@ -223,6 +223,6 @@ func TestScanChanCanceled(t *testing.T) {
 	err := sqlz.Scan(ctx, rows, records)
 
 	if err != context.Canceled {
-		t.Fatalf("err{%s} != context.Canceled", err)
+		t.Errorf("err{%s} != context.Canceled", err)
 	}
 }
