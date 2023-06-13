@@ -117,6 +117,38 @@ func TestEmbeddedPointerField(t *testing.T) {
 	}
 }
 
+func TestEmbeddedInterfaceField(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var x struct {
+		testStructRecord
+		sqlz.Rows // any interface will do
+	}
+
+	rows := mocks.NewMockRows(ctrl)
+	rows.EXPECT().
+		Columns().
+		Times(1).
+		Return(testStructRecordFields, nil)
+
+	rows.EXPECT().
+		Next().
+		Times(1).
+		Return(true)
+
+	rows.EXPECT().
+		Scan(x.fields()...).
+		Times(1).
+		Return(nil)
+
+	err := sqlz.Scan(context.Background(), rows, &x)
+
+	if err != nil {
+		t.Error("sqlz.Scan(...):", err)
+	}
+}
+
 func TestScanSlice(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
