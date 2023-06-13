@@ -149,33 +149,51 @@ func mapToScanValues(dest reflect.Value, rows Rows) ([]any, error) {
 	fieldIndex := getFieldIndex(dest.Type())
 	scanValues := make([]any, len(columns))
 	for i, column := range columns {
-		v, ok := fieldIndex[column]
+		x, ok := fieldIndex[column]
 		if !ok {
 			return nil, fmt.Errorf("sqlz: missing field mapping for column %q", column)
 		}
-		scanValues[i] = dest.FieldByIndex(v).Addr().Interface()
+		scanValues[i] = fieldByIndex(dest, x).Addr().Interface()
 	}
 	return scanValues, nil
 }
 
+// fieldByIndex has the same functionality as [reflect.Value.FieldByIndex] but uses uint16's as indexes.
+func fieldByIndex(v reflect.Value, index []uint16) reflect.Value {
+	if len(index) == 1 {
+		return v.Field(int(index[0]))
+	}
+	for i, x := range index {
+		if i > 0 {
+			if v.Kind() == reflect.Pointer {
+				v = v.Elem()
+			}
+		}
+		v = v.Field(int(x))
+	}
+	return v
+}
+
+type typeFieldIndex = map[string][]uint16
+
 var (
 	fieldIndexMu    sync.Mutex
-	fieldIndexCache = map[reflect.Type]map[string][]int{}
+	fieldIndexCache = map[reflect.Type]typeFieldIndex{}
 )
 
-func getFieldIndex(t reflect.Type) map[string][]int {
+func getFieldIndex(t reflect.Type) typeFieldIndex {
 	fieldIndexMu.Lock()
 	defer fieldIndexMu.Unlock()
 	fieldIndex, ok := fieldIndexCache[t]
 	if !ok {
-		fieldIndex = make(map[string][]int, t.NumField())
+		fieldIndex = make(typeFieldIndex, t.NumField())
 		fieldIndexFromStruct(t, nil, "", fieldIndex)
 		fieldIndexCache[t] = fieldIndex
 	}
 	return fieldIndex
 }
 
-func fieldIndexFromStruct(t reflect.Type, cursor []int, prefix string, fieldIndex map[string][]int) {
+func fieldIndexFromStruct(t reflect.Type, cursor []uint16, prefix string, fieldIndex typeFieldIndex) {
 	numField := t.NumField()
 	for i := 0; i < numField; i++ {
 		field := t.Field(i)
@@ -185,7 +203,7 @@ func fieldIndexFromStruct(t reflect.Type, cursor []int, prefix string, fieldInde
 		}
 		if field.Anonymous && field.Type.Kind() == reflect.Struct {
 			// traverse embedded struct field
-			fieldIndexFromStruct(field.Type, append(cursor, i), fieldName, fieldIndex)
+			fieldIndexFromStruct(field.Type, append(cursor, uint16(i)), fieldName, fieldIndex)
 			continue // next
 		}
 		if !field.IsExported() {
@@ -194,9 +212,9 @@ func fieldIndexFromStruct(t reflect.Type, cursor []int, prefix string, fieldInde
 		if fieldName == "" {
 			fieldName = strings.ToLower(field.Name)
 		}
-		index := make([]int, len(cursor)+1)
+		index := make([]uint16, len(cursor)+1)
 		copy(index, cursor)
-		index[len(cursor)] = i
+		index[len(cursor)] = uint16(i) // it's unlikely that a struct has more than 65536 fields.
 		fieldIndex[prefix+fieldName] = index
 	}
 }
@@ -204,6 +222,6 @@ func fieldIndexFromStruct(t reflect.Type, cursor []int, prefix string, fieldInde
 // PurgeCache purges internal caches.
 func PurgeCache() {
 	fieldIndexMu.Lock()
-	fieldIndexCache = map[reflect.Type]map[string][]int{}
+	fieldIndexCache = map[reflect.Type]typeFieldIndex{}
 	fieldIndexMu.Unlock()
 }
