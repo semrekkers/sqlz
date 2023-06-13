@@ -55,14 +55,14 @@ func Scan(ctx context.Context, rows Rows, dest any) error {
 		return rows.Scan(scanValues...)
 
 	case reflect.Slice:
-		return scanSlice(ctx, destValue, rows)
+		return scanSlice(destValue, rows)
 
 	default:
 		panic("dest must point to a struct or slice")
 	}
 }
 
-func scanSlice(ctx context.Context, slicePtr reflect.Value, rows Rows) error {
+func scanSlice(slicePtr reflect.Value, rows Rows) error {
 	slice := slicePtr.Elem()
 	elemType := slice.Type().Elem()
 	isPtrElem := elemType.Kind() == reflect.Pointer
@@ -78,11 +78,7 @@ func scanSlice(ctx context.Context, slicePtr reflect.Value, rows Rows) error {
 		return err
 	}
 	for rows.Next() {
-		var err error
-		if err = ctx.Err(); err != nil {
-			return err
-		}
-		if err = rows.Scan(scanValues); err != nil {
+		if err := rows.Scan(scanValues); err != nil {
 			return err
 		}
 		newElem := scratch
