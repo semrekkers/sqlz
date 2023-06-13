@@ -159,12 +159,7 @@ func fieldByIndex(v reflect.Value, index []uint16) reflect.Value {
 	if len(index) == 1 {
 		return v.Field(int(index[0]))
 	}
-	for i, x := range index {
-		if i > 0 {
-			if v.Kind() == reflect.Pointer {
-				v = v.Elem()
-			}
-		}
+	for _, x := range index {
 		v = v.Field(int(x))
 	}
 	return v
@@ -197,9 +192,13 @@ func fieldIndexFromStruct(t reflect.Type, cursor []uint16, prefix string, fieldI
 		if fieldName == "-" {
 			continue // skip
 		}
-		if field.Anonymous && field.Type.Kind() == reflect.Struct {
-			// traverse embedded struct field
-			fieldIndexFromStruct(field.Type, append(cursor, uint16(i)), fieldName, fieldIndex)
+		if field.Anonymous {
+			if kind := field.Type.Kind(); kind == reflect.Pointer {
+				panic("cannot use embedded pointer in struct")
+			} else if kind == reflect.Struct {
+				// traverse embedded struct field
+				fieldIndexFromStruct(field.Type, append(cursor, uint16(i)), fieldName, fieldIndex)
+			}
 			continue // next
 		}
 		if !field.IsExported() {

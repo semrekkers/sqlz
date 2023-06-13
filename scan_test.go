@@ -90,6 +90,33 @@ func TestScanMissingField(t *testing.T) {
 	}
 }
 
+func TestEmbeddedPointerField(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	var x struct {
+		*testStruct
+	}
+
+	rows := mocks.NewMockRows(ctrl)
+	rows.EXPECT().
+		Columns().
+		Return(nil, nil)
+
+	defer func() {
+		msg := recover().(string)
+		if msg != "cannot use embedded pointer in struct" {
+			t.Error("expected embedded pointer panic")
+		}
+	}()
+
+	err := sqlz.Scan(context.Background(), rows, &x)
+
+	if err != nil {
+		t.Error("sqlz.Scan(...):", err)
+	}
+}
+
 func TestScanSlice(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
