@@ -78,7 +78,7 @@ func scanSlice(slicePtr reflect.Value, rows Rows) error {
 		return err
 	}
 	for rows.Next() {
-		if err := rows.Scan(scanValues); err != nil {
+		if err := rows.Scan(scanValues...); err != nil {
 			return err
 		}
 		newElem := scratch
@@ -120,7 +120,7 @@ func scanChan(ctx context.Context, dest reflect.Value, rows Rows) error {
 		},
 	}
 	for rows.Next() {
-		if err := rows.Scan(scanValues); err != nil {
+		if err := rows.Scan(scanValues...); err != nil {
 			return err
 		}
 		newElem := scratch
