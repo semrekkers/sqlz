@@ -175,9 +175,9 @@ func TestScanSlice(t *testing.T) {
 		})
 
 	rows.EXPECT().
-		Scan(gomock.Any()).
+		Scan(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(rowsLeft).
-		DoAndReturn(func(v []any) error {
+		DoAndReturn(func(v ...any) error {
 			autoIncr++
 			idPtr := v[0].(*int)
 			*idPtr = autoIncr
@@ -229,7 +229,7 @@ func TestScanChan(t *testing.T) {
 		})
 
 	rows.EXPECT().
-		Scan(gomock.Any()).
+		Scan(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
 		Times(rowsLeft).
 		Return(nil)
 
