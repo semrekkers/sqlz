@@ -156,11 +156,8 @@ func mapToScanValues(dest reflect.Value, rows Rows) ([]any, error) {
 
 // fieldByIndex has the same functionality as [reflect.Value.FieldByIndex] but uses uint16's as indexes.
 func fieldByIndex(v reflect.Value, index []uint16) reflect.Value {
-	if len(index) == 1 {
-		return v.Field(int(index[0]))
-	}
-	for _, x := range index {
-		v = v.Field(int(x))
+	for _, i := range index {
+		v = v.Field(int(i))
 	}
 	return v
 }
