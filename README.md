@@ -5,6 +5,8 @@
 
 This package provides a set of helper functions and types to simplify operations with SQL databases in Go. It provides a more flexible and intuitive interface for scanning SQL query results directly into Go structs, slices of structs, or channels of structs. It was inspired by [jmoiron/sqlx](https://github.com/jmoiron/sqlx) but it's more lightweight. The core implementation is just the `Scan()` function.
 
+The package is considered stable and ready for production use.
+
 ## Examples
 
 Use sqlz to scan a slice of `User` structs from a query result set.
