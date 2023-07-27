@@ -21,7 +21,7 @@ type User struct {
 	FirstName string `db:"first_name"`
 	LastName  string `db:"last_name"`
 	Age       int
-	DeletedAt sqlz.Null[time.Time] `db:"deleted_at"`
+	DeletedAt *time.Time `db:"deleted_at"`
 
 	AppValue []byte `db:"-"`
 }
