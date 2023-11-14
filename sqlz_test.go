@@ -1,6 +1,6 @@
 package sqlz_test
 
-//go:generate go run github.com/golang/mock/mockgen --source scan.go --package mocks --destination internal/mocks/mocks.go
+//go:generate go run github.com/golang/mock/mockgen --source sqlz.go --package mocks --destination internal/mocks/mocks.go
 
 import (
 	"context"
