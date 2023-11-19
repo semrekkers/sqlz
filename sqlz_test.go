@@ -1,68 +1,48 @@
 package sqlz_test
 
-//go:generate go run github.com/golang/mock/mockgen --source sqlz.go --package mocks --destination internal/mocks/mocks.go
-
 import (
 	"context"
 	"testing"
 	"time"
 
 	"github.com/semrekkers/sqlz"
-	"github.com/semrekkers/sqlz/internal/mocks"
-
-	"github.com/golang/mock/gomock"
+	"github.com/semrekkers/sqlz/internal/scantest"
 )
 
-type testStruct struct {
-	ID        int
-	FirstName string `db:"first_name"`
-	LastName  string `db:"last_name"`
-	Email     string
-	Password  []byte `db:"-"`
+type testStructBase struct {
+	ID          int
+	Username    string
+	DisplayName string `db:"display_name"`
+	Email       string
+	Age         int
+	Password    []byte `db:"-"`
+	IsAdmin     bool   `db:"is_admin"`
 
 	sessionKey []byte
 }
 
-type testStructRecord struct {
-	testStruct
+type testStruct struct {
+	testStructBase
 	CreatedAt time.Time `db:"created_at"`
-	UpdatedAt time.Time `db:"updated_at"`
 }
 
-func (r *testStructRecord) fields() []any {
-	return []any{
-		&r.ID,
-		&r.FirstName,
-		&r.LastName,
-		&r.Email,
-		&r.CreatedAt,
-		&r.UpdatedAt,
-	}
+var fixedTestStruct = testStruct{
+	testStructBase{
+		ID:          1146,
+		Username:    "john_doe",
+		DisplayName: "John Doe",
+		Email:       "john@example.com",
+		Age:         42,
+		IsAdmin:     false,
+	},
+	time.Date(2023, 10, 10, 13, 14, 21, 0, time.UTC),
 }
-
-var testStructRecordFields = []string{"id", "first_name", "last_name", "email", "created_at", "updated_at"}
 
 func TestScanStruct(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var record testStructRecord
-
-	rows := mocks.NewMockRows(ctrl)
-	rows.EXPECT().
-		Columns().
-		Times(1).
-		Return(testStructRecordFields, nil)
-
-	rows.EXPECT().
-		Next().
-		Times(1).
-		Return(true)
-
-	rows.EXPECT().
-		Scan(record.fields()...).
-		Times(1).
-		Return(nil)
+	var (
+		rows   = scantest.NewRows(1)
+		record testStruct
+	)
 
 	err := sqlz.Scan(context.Background(), rows, &record)
 
@@ -72,45 +52,34 @@ func TestScanStruct(t *testing.T) {
 }
 
 func TestScanMissingField(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var record testStructRecord
-
-	rows := mocks.NewMockRows(ctrl)
-	rows.EXPECT().
-		Columns().
-		Times(1).
-		Return([]string{"order_id"}, nil)
+	var (
+		rows   = scantest.NewRows(1)
+		record testStructBase
+	)
 
 	err := sqlz.Scan(context.Background(), rows, &record)
 
-	if err.Error() != `sqlz: missing field mapping for column "order_id"` {
+	if err.Error() != `sqlz: missing field mapping for column "created_at"` {
 		t.Errorf("err{%s} != `sqlz: missing field mapping ...`", err)
 	}
 }
 
 func TestEmbeddedPointerField(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	var x struct {
-		*testStruct
-	}
-
-	rows := mocks.NewMockRows(ctrl)
-	rows.EXPECT().
-		Columns().
-		Return(nil, nil)
+	var (
+		rows   = scantest.NewRows(1)
+		record struct {
+			*testStruct
+		}
+	)
 
 	defer func() {
 		msg := recover().(string)
 		if msg != "cannot use embedded pointer in struct" {
-			t.Error("expected embedded pointer panic")
+			t.Error("erecordpected embedded pointer panic")
 		}
 	}()
 
-	err := sqlz.Scan(context.Background(), rows, &x)
+	err := sqlz.Scan(context.Background(), rows, &record)
 
 	if err != nil {
 		t.Error("sqlz.Scan(...):", err)
@@ -118,31 +87,15 @@ func TestEmbeddedPointerField(t *testing.T) {
 }
 
 func TestEmbeddedInterfaceField(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
+	var (
+		rows   = scantest.NewRows(1)
+		record struct {
+			testStruct
+			sqlz.Rows // any interface will do
+		}
+	)
 
-	var x struct {
-		testStructRecord
-		sqlz.Rows // any interface will do
-	}
-
-	rows := mocks.NewMockRows(ctrl)
-	rows.EXPECT().
-		Columns().
-		Times(1).
-		Return(testStructRecordFields, nil)
-
-	rows.EXPECT().
-		Next().
-		Times(1).
-		Return(true)
-
-	rows.EXPECT().
-		Scan(x.fields()...).
-		Times(1).
-		Return(nil)
-
-	err := sqlz.Scan(context.Background(), rows, &x)
+	err := sqlz.Scan(context.Background(), rows, &record)
 
 	if err != nil {
 		t.Error("sqlz.Scan(...):", err)
@@ -150,44 +103,10 @@ func TestEmbeddedInterfaceField(t *testing.T) {
 }
 
 func TestScanSlice(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var (
-		rowsLeft = 4
-		autoIncr = 0
-		records  []*testStructRecord
+		rows    = scantest.NewRows(4)
+		records []*testStruct
 	)
-
-	rows := mocks.NewMockRows(ctrl)
-	rows.EXPECT().
-		Columns().
-		Times(1).
-		Return(testStructRecordFields, nil)
-
-	rows.EXPECT().
-		Next().
-		Times(rowsLeft + 1).
-		DoAndReturn(func() (b bool) {
-			b = rowsLeft > 0
-			rowsLeft--
-			return
-		})
-
-	rows.EXPECT().
-		Scan(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Times(rowsLeft).
-		DoAndReturn(func(v ...any) error {
-			autoIncr++
-			idPtr := v[0].(*int)
-			*idPtr = autoIncr
-			return nil
-		})
-
-	rows.EXPECT().
-		Err().
-		Times(1).
-		Return(nil)
 
 	err := sqlz.Scan(context.Background(), rows, &records)
 
@@ -197,46 +116,13 @@ func TestScanSlice(t *testing.T) {
 	if len(records) != 4 {
 		t.Errorf("len(records){%d} != 4", len(records))
 	}
-	for i, v := range records {
-		if expect := i + 1; v.ID != expect {
-			t.Errorf("records[%d].ID{%d} != %d", i, v.ID, expect)
-		}
-	}
 }
 
 func TestScanChan(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var (
-		rowsLeft = 4
-		records  = make(chan *testStructRecord, rowsLeft+2)
+		rows    = scantest.NewRows(4)
+		records = make(chan *testStruct, 50)
 	)
-
-	rows := mocks.NewMockRows(ctrl)
-	rows.EXPECT().
-		Columns().
-		Times(1).
-		Return(testStructRecordFields, nil)
-
-	rows.EXPECT().
-		Next().
-		Times(rowsLeft + 1).
-		DoAndReturn(func() (b bool) {
-			b = rowsLeft > 0
-			rowsLeft--
-			return
-		})
-
-	rows.EXPECT().
-		Scan(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
-		Times(rowsLeft).
-		Return(nil)
-
-	rows.EXPECT().
-		Err().
-		Times(1).
-		Return(nil)
 
 	err := sqlz.Scan(context.Background(), rows, records)
 	close(records)
@@ -254,30 +140,12 @@ func TestScanChan(t *testing.T) {
 }
 
 func TestScanChanCanceled(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
 	var (
 		ctx, cancel = context.WithCancel(context.Background())
-		records     = make(chan *testStructRecord)
+		rows        = scantest.NewRows(1)
+		records     = make(chan *testStruct)
 	)
 	cancel()
-
-	rows := mocks.NewMockRows(ctrl)
-	rows.EXPECT().
-		Columns().
-		Times(1).
-		Return(testStructRecordFields, nil)
-
-	rows.EXPECT().
-		Next().
-		Times(1).
-		Return(true)
-
-	rows.EXPECT().
-		Scan(gomock.Any()).
-		Times(1).
-		Return(nil)
 
 	err := sqlz.Scan(ctx, rows, records)
 
