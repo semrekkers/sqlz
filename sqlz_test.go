@@ -2,6 +2,7 @@ package sqlz_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 	"time"
 
@@ -49,6 +50,9 @@ func TestScanStruct(t *testing.T) {
 	if err != nil {
 		t.Error("sqlz.Scan(...):", err)
 	}
+	if !reflect.DeepEqual(record, fixedTestStruct) {
+		t.Errorf("record %v != fixedTestStruct", record)
+	}
 }
 
 func TestScanMissingField(t *testing.T) {
@@ -75,7 +79,7 @@ func TestEmbeddedPointerField(t *testing.T) {
 	defer func() {
 		msg := recover().(string)
 		if msg != "cannot use embedded pointer in struct" {
-			t.Error("erecordpected embedded pointer panic")
+			t.Error("expected embedded pointer panic")
 		}
 	}()
 
@@ -100,6 +104,9 @@ func TestEmbeddedInterfaceField(t *testing.T) {
 	if err != nil {
 		t.Error("sqlz.Scan(...):", err)
 	}
+	if !reflect.DeepEqual(record.testStruct, fixedTestStruct) {
+		t.Errorf("record %v != fixedTestStruct", record)
+	}
 }
 
 func TestScanSlice(t *testing.T) {
@@ -116,6 +123,11 @@ func TestScanSlice(t *testing.T) {
 	if len(records) != 4 {
 		t.Errorf("len(records){%d} != 4", len(records))
 	}
+	for i, rec := range records {
+		if !reflect.DeepEqual(*rec, fixedTestStruct) {
+			t.Errorf("record[%d] %v != fixedTestStruct", i, *rec)
+		}
+	}
 }
 
 func TestScanChan(t *testing.T) {
@@ -131,7 +143,10 @@ func TestScanChan(t *testing.T) {
 		t.Error("sqlz.Scan(...):", err)
 	}
 	var recordCount int
-	for range records {
+	for v := range records {
+		if !reflect.DeepEqual(*v, fixedTestStruct) {
+			t.Errorf("record[%d] %v != fixedTestStruct", recordCount, *v)
+		}
 		recordCount++
 	}
 	if recordCount != 4 {
