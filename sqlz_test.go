@@ -183,19 +183,24 @@ func TestScanChanCanceled(t *testing.T) {
 	}
 }
 
+const maxRows = 1_000_000_000
+
 func BenchmarkScanStruct(b *testing.B) {
 	var (
-		sc   sqlz.Scanner
-		rows = scantest.NewRows(1_000_000_000)
+		sc sqlz.Scanner
 	)
+	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
-		var record testStruct
-		if err := sc.Scan(context.Background(), rows, &record); err != nil {
-			b.Error(err)
+	b.RunParallel(func(p *testing.PB) {
+		rows := scantest.NewRows(maxRows)
+		for p.Next() {
+			var record testStruct
+			if err := sc.Scan(context.Background(), rows, &record); err != nil {
+				b.Error(err)
+			}
 		}
-	}
+	})
 }
 
 func BenchmarkScanStructParallel(b *testing.B) {

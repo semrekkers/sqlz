@@ -1,39 +1,51 @@
 package sqlz
 
 import (
+	"maps"
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 )
 
 type structFieldIndex map[string][]uint16
 
 type cache struct {
-	types map[reflect.Type]structFieldIndex
+	types atomic.Pointer[map[reflect.Type]structFieldIndex]
 	mu    sync.Mutex
 }
 
+func (c *cache) load() (x map[reflect.Type]structFieldIndex) {
+	if ptr := c.types.Load(); ptr != nil {
+		x = *ptr
+	}
+	return
+}
+
 func (c *cache) getStructFieldIndex(t reflect.Type) structFieldIndex {
-	var (
-		x  structFieldIndex
-		ok bool
-	)
+	if x, ok := c.load()[t]; ok {
+		return x // fast path
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if x, ok = c.types[t]; !ok {
-		if c.types == nil {
-			c.types = make(map[reflect.Type]structFieldIndex)
-		}
-		x = make(structFieldIndex, t.NumField())
-		fillStructFieldIndex(x, t, nil, "")
-		c.types[t] = x
+	types := c.load()
+	if x, ok := types[t]; ok {
+		return x
+	} else if types != nil {
+		types = maps.Clone(types)
+	} else {
+		types = make(map[reflect.Type]structFieldIndex, 1)
 	}
+	x := make(structFieldIndex, t.NumField())
+	fillStructFieldIndex(x, t, nil, "")
+	types[t] = x
+	c.types.Store(&types)
 	return x
 }
 
 func (c *cache) purge() {
 	c.mu.Lock()
-	c.types = nil
+	c.types.Store(nil)
 	c.mu.Unlock()
 }
 
