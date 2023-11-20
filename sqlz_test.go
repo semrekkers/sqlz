@@ -68,6 +68,20 @@ func TestScanMissingField(t *testing.T) {
 	}
 }
 
+func TestScanIgnoreUnknownColumns(t *testing.T) {
+	var (
+		sc     = sqlz.Scanner{IgnoreUnknownColumns: true}
+		rows   = scantest.NewRows(1)
+		record testStructBase
+	)
+
+	err := sc.Scan(context.Background(), rows, &record)
+
+	if err != nil {
+		t.Error("sqlz.Scan(...):", err)
+	}
+}
+
 func TestEmbeddedPointerField(t *testing.T) {
 	var (
 		rows   = scantest.NewRows(1)
@@ -166,5 +180,73 @@ func TestScanChanCanceled(t *testing.T) {
 
 	if err != context.Canceled {
 		t.Errorf("err{%s} != context.Canceled", err)
+	}
+}
+
+func BenchmarkScanStruct(b *testing.B) {
+	var (
+		sc   sqlz.Scanner
+		rows = scantest.NewRows(1_000_000_000)
+	)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var record testStruct
+		if err := sc.Scan(context.Background(), rows, &record); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkScanStructParallel(b *testing.B) {
+	var (
+		sc sqlz.Scanner
+	)
+	b.ResetTimer()
+
+	b.RunParallel(func(p *testing.PB) {
+		rows := scantest.NewRows(1_000_000_000)
+		for p.Next() {
+			var record testStruct
+			if err := sc.Scan(context.Background(), rows, &record); err != nil {
+				b.Error(err)
+			}
+		}
+	})
+}
+
+func BenchmarkScanSlice(b *testing.B) {
+	var (
+		sc sqlz.Scanner
+	)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		var records []*testStruct
+		if err := sc.Scan(ctx, scantest.NewRows(30), &records); err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkScanChan(b *testing.B) {
+	var (
+		sc sqlz.Scanner
+		ch = make(chan *testStruct, 32)
+	)
+	go func() {
+		for range ch {
+			// drain
+		}
+	}()
+	b.Cleanup(func() {
+		close(ch)
+	})
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		if err := sc.Scan(context.Background(), scantest.NewRows(30), ch); err != nil {
+			b.Error(err)
+		}
 	}
 }

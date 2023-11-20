@@ -12,6 +12,10 @@ import (
 // It's safe for concurrent use by multiple goroutines. The zero value is ready to use.
 type Scanner struct {
 	tc cache
+
+	// IgnoreUnknownColumns controls whether Scan will return an error if a column in the result set has no corresponding struct field.
+	// Default is false (return an error).
+	IgnoreUnknownColumns bool
 }
 
 // Scan is for scanning the result set from rows into a destination structure.
@@ -80,6 +84,7 @@ func (s *Scanner) scanSlice(slicePtr reflect.Value, rows Rows) error {
 			newElem.Elem().Set(elem)
 		}
 		slice = reflect.Append(slice, newElem)
+		elem.SetZero()
 	}
 	if err = rows.Err(); err != nil {
 		return err
@@ -122,10 +127,11 @@ func (s *Scanner) scanChan(ctx context.Context, dest reflect.Value, rows Rows) e
 			newElem.Elem().Set(elem)
 		}
 		selectOps[0].Send = newElem
-		if selected, _, _ := reflect.Select(selectOps); selected == 1 {
+		if chosen, _, _ := reflect.Select(selectOps); chosen == 1 {
 			// select on ctx.Done()
 			return ctx.Err()
 		}
+		elem.SetZero()
 	}
 	return rows.Err()
 }
@@ -137,12 +143,16 @@ func (s *Scanner) mapFieldDest(dest reflect.Value, rows Rows) ([]any, error) {
 	}
 	fieldIndex := s.tc.getStructFieldIndex(dest.Type())
 	scanValues := make([]any, len(columns))
+	placeholder := new(any)
 	for i, column := range columns {
 		x, ok := fieldIndex[column]
-		if !ok {
+		if ok {
+			scanValues[i] = fieldByIndex(dest, x).Addr().Interface()
+		} else if !s.IgnoreUnknownColumns {
 			return nil, fmt.Errorf("sqlz: missing field mapping for column %q", column)
+		} else {
+			scanValues[i] = placeholder
 		}
-		scanValues[i] = fieldByIndex(dest, x).Addr().Interface()
 	}
 	return scanValues, nil
 }

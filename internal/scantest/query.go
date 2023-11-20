@@ -109,10 +109,13 @@ func (r *Rows) Scan(dest ...any) error {
 }
 
 func scanv[T any](name string, dest any, v T) error {
-	x, ok := dest.(*T)
-	if !ok {
+	switch x := dest.(type) {
+	case *T:
+		*x = v
+	case *any:
+		*x = v
+	default:
 		return fmt.Errorf("scantest: scan %s: cannot convert %T to %T", name, v, dest)
 	}
-	*x = v
 	return nil
 }
