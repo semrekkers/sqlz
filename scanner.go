@@ -52,16 +52,15 @@ func (s *Scanner) Scan(ctx context.Context, rows Rows, dest any) error {
 		return rows.Scan(destValues...)
 
 	case reflect.Slice:
-		return s.scanSlice(destValue, rows)
+		return s.scanSlice(destValue.Elem(), rows)
 
 	default:
 		panic("dest must point to a struct or slice")
 	}
 }
 
-func (s *Scanner) scanSlice(slicePtr reflect.Value, rows Rows) error {
-	slice := slicePtr.Elem()
-	elemType := slice.Type().Elem()
+func (s *Scanner) scanSlice(dest reflect.Value, rows Rows) error {
+	elemType := dest.Type().Elem()
 	isPtrElem := elemType.Kind() == reflect.Pointer
 	if isPtrElem {
 		elemType = elemType.Elem()
@@ -74,6 +73,7 @@ func (s *Scanner) scanSlice(slicePtr reflect.Value, rows Rows) error {
 	if err != nil {
 		return err
 	}
+	dlen, dcap := dest.Len(), dest.Cap()
 	for rows.Next() {
 		if err := rows.Scan(destValues...); err != nil {
 			return err
@@ -83,13 +83,21 @@ func (s *Scanner) scanSlice(slicePtr reflect.Value, rows Rows) error {
 			newElem = reflect.New(elemType)
 			newElem.Elem().Set(elem)
 		}
-		slice = reflect.Append(slice, newElem)
+		// Inlining the append step like this is much faster than using [reflect.Append].
+		if dlen+1 > dcap {
+			// Extend the slice when needed.
+			dest.Grow(1)
+			dcap = dest.Cap()
+		}
+		dest.SetLen(dlen + 1)
+		dest.Index(dlen).Set(newElem)
+		dlen++
+		// Resetting the elem to zero is needed to handle null cells correctly.
 		elem.SetZero()
 	}
 	if err = rows.Err(); err != nil {
 		return err
 	}
-	slicePtr.Elem().Set(slice)
 	return nil
 }
 
@@ -131,6 +139,7 @@ func (s *Scanner) scanChan(ctx context.Context, dest reflect.Value, rows Rows) e
 			// select on ctx.Done()
 			return ctx.Err()
 		}
+		// Resetting the elem to zero is needed to handle null cells correctly.
 		elem.SetZero()
 	}
 	return rows.Err()

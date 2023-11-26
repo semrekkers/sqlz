@@ -183,30 +183,11 @@ func TestScanChanCanceled(t *testing.T) {
 	}
 }
 
-const maxRows = 1_000_000_000
-
 func BenchmarkScanStruct(b *testing.B) {
 	var (
 		sc sqlz.Scanner
 	)
 	b.ReportAllocs()
-	b.ResetTimer()
-
-	b.RunParallel(func(p *testing.PB) {
-		rows := scantest.NewRows(maxRows)
-		for p.Next() {
-			var record testStruct
-			if err := sc.Scan(context.Background(), rows, &record); err != nil {
-				b.Error(err)
-			}
-		}
-	})
-}
-
-func BenchmarkScanStructParallel(b *testing.B) {
-	var (
-		sc sqlz.Scanner
-	)
 	b.ResetTimer()
 
 	b.RunParallel(func(p *testing.PB) {
@@ -224,20 +205,25 @@ func BenchmarkScanSlice(b *testing.B) {
 	var (
 		sc sqlz.Scanner
 	)
+	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
-		var records []*testStruct
-		if err := sc.Scan(ctx, scantest.NewRows(30), &records); err != nil {
-			b.Error(err)
+	b.RunParallel(func(p *testing.PB) {
+		records := make([]testStruct, 0, 30)
+		for p.Next() {
+			rows := scantest.NewRows(30)
+			if err := sc.Scan(context.Background(), rows, &records); err != nil {
+				b.Error(err)
+			}
+			records = records[:0]
 		}
-	}
+	})
 }
 
 func BenchmarkScanChan(b *testing.B) {
 	var (
 		sc sqlz.Scanner
-		ch = make(chan *testStruct, 32)
+		ch = make(chan *testStruct, 30)
 	)
 	go func() {
 		for range ch {
@@ -247,11 +233,15 @@ func BenchmarkScanChan(b *testing.B) {
 	b.Cleanup(func() {
 		close(ch)
 	})
+	b.ReportAllocs()
 	b.ResetTimer()
 
-	for i := 0; i < b.N; i++ {
-		if err := sc.Scan(context.Background(), scantest.NewRows(30), ch); err != nil {
-			b.Error(err)
+	b.RunParallel(func(p *testing.PB) {
+		for p.Next() {
+			rows := scantest.NewRows(30)
+			if err := sc.Scan(context.Background(), rows, ch); err != nil {
+				b.Error(err)
+			}
 		}
-	}
+	})
 }
