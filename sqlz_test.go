@@ -104,6 +104,42 @@ func TestEmbeddedPointerField(t *testing.T) {
 	}
 }
 
+func TestPointerField(t *testing.T) {
+	var (
+		sc     = sqlz.Scanner{IgnoreUnknownColumns: true}
+		rows   = scantest.NewRows(1)
+		record struct {
+			Row *testStruct
+		}
+	)
+
+	// The Row field of record should be silently ignored.
+	err := sc.Scan(context.Background(), rows, &record)
+
+	if err != nil {
+		t.Error("sqlz.Scan(...):", err)
+	}
+}
+
+func TestScanSmallStruct(t *testing.T) {
+	var (
+		sc     = sqlz.Scanner{IgnoreUnknownColumns: true}
+		rows   = scantest.NewRows(1)
+		record struct {
+			Age int
+		}
+	)
+
+	err := sc.Scan(context.Background(), rows, &record)
+
+	if err != nil {
+		t.Error("sqlz.Scan(...):", err)
+	}
+	if record.Age != 42 {
+		t.Errorf("record.Age{%d} != 42", record.Age)
+	}
+}
+
 func TestEmbeddedInterfaceField(t *testing.T) {
 	var (
 		rows   = scantest.NewRows(1)
